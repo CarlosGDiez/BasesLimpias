@@ -1,0 +1,161 @@
+"Fecha","CountryName","CountryCode","GovernmentResponseIndex"
+2020-06-23,"Afghanistan","AFG",60.9
+2020-03-27,"Angola","AGO",65.38
+2020-07-10,"Albania","ALB",62.82
+2020-08-12,"Andorra","AND",57.05
+2020-02-25,"United Arab Emirates","ARE",13.46
+2020-09-16,"Argentina","ARG",85.26
+2020-08-14,"Australia","AUS",81.73
+2020-08-19,"Austria","AUT",50.64
+2020-06-04,"Azerbaijan","AZE",79.49
+2020-07-28,"Burundi","BDI",16.03
+2020-08-19,"Belgium","BEL",61.54
+2020-06-16,"Benin","BEN",53.21
+2020-08-28,"Burkina Faso","BFA",43.59
+2020-07-17,"Bangladesh","BGD",72.12
+2020-07-15,"Bulgaria","BGR",44.87
+2020-04-08,"Bahrain","BHR",83.33
+2020-03-19,"Bosnia and Herzegovina","BIH",64.74
+2020-07-01,"Belarus","BLR",25
+2020-04-08,"Belize","BLZ",66.03
+2020-06-09,"Bolivia","BOL",71.79
+2020-07-22,"Brazil","BRA",68.91
+2020-08-14,"Barbados","BRB",51.92
+2020-03-12,"Brunei","BRN",30.13
+2020-06-24,"Bhutan","BTN",82.05
+2020-06-15,"Botswana","BWA",69.87
+2020-04-13,"Central African Republic","CAF",51.28
+2020-06-14,"Canada","CAN",72.12
+2020-05-31,"Switzerland","CHE",66.03
+2020-04-10,"Chile","CHL",69.23
+2020-01-25,"China","CHN",43.27
+2020-07-31,"Cote d'Ivoire","CIV",42.63
+2020-09-08,"Cameroon","CMR",52.56
+2020-03-21,"Colombia","COL",48.08
+2020-07-25,"Costa Rica","CRI",65.06
+2020-07-30,"Cuba","CUB",64.1
+2020-07-25,"Cyprus","CYP",63.46
+2020-02-09,"Germany","DEU",14.1
+2020-05-22,"Djibouti","DJI",60.26
+2020-04-13,"Dominica","DMA",67.95
+2020-05-15,"Denmark","DNK",74.36
+2020-08-06,"Dominican Republic","DOM",67.31
+2020-09-21,"Algeria","DZA",70.51
+2020-04-29,"Ecuador","ECU",85.26
+2020-02-23,"Egypt","EGY",10.26
+2020-09-15,"Eritrea","ERI",76.92
+2020-02-04,"Spain","ESP",17.95
+2020-03-29,"Estonia","EST",60.26
+2020-09-15,"Ethiopia","ETH",67.95
+2020-03-18,"Finland","FIN",51.92
+2020-04-16,"Fiji","FJI",85.9
+2020-05-16,"France","FRA",79.49
+2020-08-10,"Gabon","GAB",75
+2020-06-30,"United Kingdom","GBR",67.63
+2020-06-30,"United Kingdom","GBR",74.36
+2020-06-30,"United Kingdom","GBR",79.49
+2020-06-30,"United Kingdom","GBR",77.56
+2020-06-30,"United Kingdom","GBR",78.21
+2020-05-10,"Georgia","GEO",85.26
+2020-07-28,"Ghana","GHA",51.92
+2020-07-02,"Guinea","GIN",46.79
+2020-05-07,"Gambia","GMB",63.46
+2020-06-10,"Greece","GRC",60.26
+2020-08-13,"Guatemala","GTM",75
+2020-09-02,"Guyana","GUY",64.74
+2020-05-14,"Honduras","HND",89.1
+2020-06-01,"Croatia","HRV",64.1
+2020-04-20,"Haiti","HTI",68.59
+2020-04-10,"Hungary","HUN",71.15
+2020-07-22,"Indonesia","IDN",53.53
+2020-02-13,"India","IND",17.31
+2020-07-27,"Ireland","IRL",55.13
+2020-08-19,"Iran","IRN",67.95
+2020-04-15,"Iraq","IRQ",75.64
+2020-04-25,"Iceland","ISL",67.95
+2020-07-27,"Israel","ISR",58.33
+2020-08-13,"Italy","ITA",59.62
+2020-04-23,"Jamaica","JAM",74.36
+2020-09-21,"Jordan","JOR",64.74
+2020-06-07,"Japan","JPN",36.54
+2020-06-09,"Kazakhstan","KAZ",74.68
+2020-06-24,"Kenya","KEN",77.56
+2020-03-11,"Cambodia","KHM",13.46
+2020-07-05,"Kuwait","KWT",76.28
+2020-07-05,"Laos","LAO",25.64
+2020-07-23,"Lebanon","LBN",42.31
+2020-05-15,"Liberia","LBR",67.31
+2020-05-10,"Libya","LBY",75.64
+2020-02-28,"Sri Lanka","LKA",17.95
+2020-09-18,"Lesotho","LSO",59.62
+2020-09-14,"Lithuania","LTU",37.82
+2020-04-09,"Luxembourg","LUX",80.77
+2020-06-14,"Latvia","LVA",55.13
+2020-05-19,"Morocco","MAR",81.41
+2020-07-11,"Moldova","MDA",72.44
+2020-03-26,"Madagascar","MDG",69.87
+2020-07-03,"Mexico","MEX",55.45
+2020-06-22,"Mali","MLI",54.49
+2020-08-14,"Mongolia","MNG",58.33
+2020-08-05,"Mozambique","MOZ",41.03
+2020-06-01,"Mauritania","MRT",71.79
+2020-07-20,"Mauritius","MUS",38.46
+2020-08-17,"Malawi","MWI",70.51
+2020-07-10,"Malaysia","MYS",62.18
+2020-04-11,"Namibia","NAM",67.95
+2020-08-19,"Niger","NER",23.72
+2020-05-11,"Nigeria","NGA",66.03
+2020-09-16,"Nicaragua","NIC",10.26
+2020-07-31,"Netherlands","NLD",50
+2020-05-11,"Norway","NOR",61.54
+2020-02-08,"Nepal","NPL",21.79
+2020-04-02,"New Zealand","NZL",89.1
+2020-08-18,"Oman","OMN",82.05
+2020-06-16,"Pakistan","PAK",62.82
+2020-05-23,"Panama","PAN",80.77
+2020-08-19,"Peru","PER",83.33
+2020-03-31,"Philippines","PHL",82.05
+2020-06-07,"Papua New Guinea","PNG",56.73
+2020-04-08,"Poland","POL",64.74
+2020-06-01,"Portugal","PRT",68.59
+2020-03-15,"Paraguay","PRY",45.51
+2020-07-07,"Qatar","QAT",76.92
+2020-07-22,"Kosovo","RKS",53.85
+2020-08-01,"Romania","ROU",51.92
+2020-02-13,"Russia","RUS",8.33
+2020-04-07,"Rwanda","RWA",82.05
+2020-05-04,"Saudi Arabia","SAU",85.9
+2020-06-21,"Sudan","SDN",75
+2020-08-19,"Senegal","SEN",50.64
+2020-05-29,"Singapore","SGP",84.62
+2020-09-16,"Sierra Leone","SLE",NA
+2020-04-05,"El Salvador","SLV",74.36
+2020-07-18,"San Marino","SMR",46.15
+2020-05-02,"Somalia","SOM",44.23
+2020-07-15,"Serbia","SRB",46.79
+2020-04-25,"South Sudan","SSD",68.59
+2020-06-06,"Suriname","SUR",78.85
+2020-06-12,"Slovenia","SVN",47.44
+2020-02-01,"Sweden","SWE",10.26
+2020-09-24,"Eswatini","SWZ",NA
+2020-09-12,"Seychelles","SYC",35.9
+2020-09-23,"Syria","SYR",39.74
+2020-05-23,"Chad","TCD",65.38
+2020-03-11,"Togo","TGO",2.56
+2020-08-12,"Thailand","THA",54.49
+2020-08-16,"Tajikistan","TJK",51.92
+2020-05-01,"Timor-Leste","TLS",74.36
+2020-04-12,"Trinidad and Tobago","TTO",71.79
+2020-06-06,"Tunisia","TUN",69.23
+2020-06-27,"Turkey","TUR",70.51
+2020-08-24,"Tanzania","TZA",15.38
+2020-09-04,"Uganda","UGA",70.51
+2020-06-29,"Ukraine","UKR",44.87
+2020-04-04,"Uruguay","URY",66.03
+2020-03-28,"Uzbekistan","UZB",80.77
+2020-07-02,"Venezuela","VEN",75.64
+2020-01-27,"Vietnam","VNM",4.49
+2020-07-01,"Yemen","YEM",40.38
+2020-04-15,"South Africa","ZAF",73.72
+2020-06-04,"Zambia","ZMB",41.67
+2020-07-04,"Zimbabwe","ZWE",58.97
