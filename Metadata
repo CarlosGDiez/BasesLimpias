@@ -1,0 +1,43 @@
+Alumno: Carlos GUilllermo Diez Bazan
+Codigo:20180898
+Referido al segundo entregable
+Grupo:Grupo2
+Tema de trabajo: causas de las diferencias de la tasa de contagio del COVID-19 durante los primeros 30 días
+Pregunta de investigación: ¿Qué factores explican la diferencia entra la cantidad de contagiados por cada cien mil habitantes durante los primeros treinta dias en distitntos país?
+
+METADATA
+
+Se presentan dos variables: la efectividad del gobierno y el indice de rigurosidad. A continuación, se explicara cada uno de ellos.
+
+
+Descripción GEE:La efectividad de gobierno (GEE) es uno de los seis indicadores brindados por el banco mundial cuya información es accesible dentro de la siguiente página:"https://info.worldbank.org/governance/wgi/Home/FAQ". En ella se define la efectividad de gobierno como "la captura de percepciones sobre la calidad de los servicios públicos, del servicio civil y su independencia de presiones políticas, la calidad de la formualcion de políticas y su implementacion, y la credibilidad del compromiso del gobierno con dichas políticas." Habiendo mencionado eso, es necesario hacer incapie en que el uso de la terminología percepción por parte del banco mundial no hace referencia exclusiva a los ciudadanos, sino que mantiene énfasis en que se captura, también, las visiones de los expertos, ONGs, organizaciones públicas,etc. De hecho, se menciona, entre sus fuentes para la creacion de dicho indicador, el Global Integrity Index, el Political Economic Risk Consultancy Corruption in Asia Survey, la Political Risk Services International Country Risk Guide, el Reporters Without Borders Press Freedom Index. Así pues, el término percepcion hace referencia no a que la información sea únicamente subjetiva, sino a que es el entendimiento de la realidad que se posee. Esto tenía que ser resaltado puesto que no es el uso habitual de la palabra. Además debería mencionarse algunas de las variables tomadas en cuenta para la construcción de este indicador. Entre estas destacan, la calidad de la burocracia, la excesividad de esta, el area (aunque no  hay mayor informacion al respecto, siendo el ingles coverage area, se entiende desde ello que hace referencia a la proporcion del país que lo recibe) en la que se cubren servicios básicos (eduación,salud,etc). Todo esto y mucho más es incluido para formar un indicador que va de -2.5 hasta 2.5, aunque posee cierto error estandar. Esta medida es hecha anulamente, los datos usados corresponden al 2018 año más reciente registrado.
+
+
+Significado de códigos:En la base limpia que refiere al GEE, se mantiene el indice (variable numerica) de -2.5 a 2.5 (que se ha titulado como Gee$Indice) y el código del pais (títulado como Gee$CountryCode). Este último denomina el país cuya efectividad esta siendo medida, se ha preferido el código por encima del nombre del País para evitar errores de traducción. Los valores de Gee$Limitesup y Gee$Limiteinf, representan el indice aumentado o disminuido en el error estandar que otorga el banco mundial.
+                Base de datos: Gee
+                Variable independiente a resaltar: Gee$Indice
+                Tipo:numérica
+                Fuente: Banco Mundial
+                año:2018
+                Variable que describe:Gee$CountryCode
+                (no es la dependiente porque esa es contagios que no esta incluida)
+                Tipo: categórica
+
+
+Justificación: El propósito de esta primera variable (representada por el indicador GEE) es servir como una medida objetiva de la capacidad estatal de un país. Este concepto (capacidad estatal) tiene diversas definiciones, quizá, la más simple de ellas es que es la capacidad de un Estado de cumplir lo que se propone. En ese sentido, dos países pueden optar por una misma medida (pro ejemplo una cuarentena), pero no hay razón para asumir que serán igualmente capaces de aplicarla (pr ejemplo quiza un pais solo logra retener al 50% de la población en cuarentena y el otro al 80%). Por ese motivo, este indidicador de efectividad gubernamental serviría para explicar porque la toma de mismas medidas tuvo un rendimiento distinto en distitnos países.
+
+
+Descricpion rigurosidad: Este indicador fue creado por la universidad de Oxford. Tiene como proposito representar lo estricto de las medidas gubernamentales de un país frente al Covid 19. Para ello toma en cuenta nueve variables, que representan medidas que pueden o no estar siendo aplciada dentro de un país (y específica si son generales para el país o específicas para una zona), para construir un indice que posee valores que van del cero al cien. Las variables consideradas para tal indicador, en lo que refiere a cierre y contención son: el cierre de escuelas, de lugares de trabajo, la cancelacion de eventos públicos, limitación de reuniones, el cierre del transporte público, el requerimiento de quedarse en casa, la restriccion en movimiento interno, los controles en viajes internacionales. Además toma en cuenta, cuestiones como campañas informativas. Pero ello, hemos optado por estudiarlo con mayor enfasis y por separado al plantear podrías ser central por si mismo. Todos estos datos son de este año, pero, para medir las reacciones tempranas del gobierno se han separado las respuestas para tomar en cuenta las restricciones de los países a siete días de su primer contagio. Asi esta variable independiente, mostrará la rigurosidad (de ahí el nombre) de las medidas gubernamentales de contencion tras una semana de iniciar el contagio. En otras palabras, mostrará que tan estrictas son las medidas que, en ese momento, teoricamente el gobierno está aplicando (puesto que como se menciono en la variable anterior hay una diferencia entre lo que el gobierno planea y lo que su capacida estatal le permite hacer).
+
+Significado de códigos: En la base limpia se hallan cuatro columnas. La columna rigurosidad$CountryName (que es una variable categorica) presenta el nombre del país, se considero eliminar esta columna (como se hizo en la base Gee), pero se decidió conservarla en este caso, para que, en caso no se sepa a que país pertenece un código sea sencillo encontrarlo.No obstante no es una variable importante para el estudio mismo, solo para su psoterior analisis. La variable rigurosidad$CountryCode (que es una variable categorica) en cambio representa la variable clave para futuras uniones de bases de datos porque es la manera de designar países que se ha optado por conservar para evitar errores en traducciones de los nombres. La principal variable es la de rigurosidad$StringencyIndex que permite ver un indice numerico del 0 al 100 que representa, como se menciono antes, que tan estrictas son las medidas tomadas para contencion y cierre. Por último, se tiene la variable rigurosidad$fecha (en formato de fecha) que marca el día séptimo en cada país desde que iniciaron los contagios en dicho país; ha sido conservada en caso más adelante sea necesario señalar cuando es el séptimo día desde el inicio del contagio.
+                Base de datos: rigurosidad
+                Variable independiente a resaltar: rigurosidad$StringencyIndex 
+                Tipo:numérica
+                Fuente: Oxford
+                año:2020
+                Variable que describe:rigurosidad$CountryCode
+                (no es la dependiente porque esa es contagios que no esta incluida)
+                Tipo: categórica
+
+
+Justificación: Esta variable independiente es necesaria para  ver si la toma temprana de medidas estrictas contribuyó a una facil contencion del Covid-19. En ese sentido, contrastar sus resultados con los obtenidos en el indice de efectividad gubernamental, le permitirían a uno conocer, si las medidas específicas fueron más importantes en la contención del Covid-19 que la capacidad estatal y viceversa. Además al tomar una amplia gama de variables, permite establecer si, por lo menos, se había tomado algún tipo de medida. Es decir, no solo permite saber si las medidas importan más, o no, que la capacidad estatal (basta con buscar dos países con parecido indice de rigurosidad y distintos GEE para ver si esto tiene efecto, o con parecidos GEE y distitnas medidas), sino que permite observar si un país, independientemente de la capacidad estatal, tomó alguna medida con rápidez o no, algo que sin dudda es importante para explciar la diferencia en el rendimiento de distitnos países frente al Covid-19.
