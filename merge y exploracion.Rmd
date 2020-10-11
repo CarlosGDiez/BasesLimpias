@@ -1,0 +1,175 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+cargar librerias:
+```{r}
+library(rio)
+library(readr)
+library(lubridate)
+library(plyr)
+library(dplyr) #creo que solo requiero una de las últimas cuatro pero  no estoy seguro de cual
+library(stringr)
+
+```
+
+Traer bases de datos:
+```{r}
+link1="https://github.com/CarlosGDiez/BasesLimpias/raw/master/Gee_sucio.csv"
+
+data1=import(link1) #esto puede ser demasiado pesado para correrlo como Chunk... como linea individual no tiene problema.
+dim(data1) 
+
+link2="https://github.com/CarlosGDiez/BasesLimpias/blob/master/Rigurosidad.csv?raw=true" #esto puede ser demasiado pesado para correrlo como Chunk... como linea individual no tiene problema.
+data2=import(link2)
+dim(data2)
+```
+
+Limpieza GEE
+```{r}
+#Renombrar variables
+names(data1)[1]="Country"
+names(data1)[2]="CODE"
+names(data1)[3]="Series"
+#Filtrar para tomar valor GEE y no el error estandar
+
+Prueba1=data1%>%
+  group_by(Country)%>%
+  mutate(Index = ifelse(Series==nth(Series,1), 1, 0))%>%
+  filter(Index==1)
+#eliminamos filas vacías
+Prueba1=Prueba1[-c(215,216,217,218,219),]
+
+names(Prueba1)[5]="Indice"
+  Prueba1$Indice=parse_number(Prueba1$Indice)
+  #eliminamos filas sin valores
+  
+Prueba1=Prueba1[-c(46,129,139,144,164),]
+
+
+str(Prueba1$Indice)
+Prueba1$Indice=as.numeric(Prueba1$Indice)
+str(Prueba1$Indice)
+```
+Limpieza adicional. Es útil reducir todo solo a código de país e indice,
+
+```{r}
+Prueba1$Country=NULL
+Prueba1$Series=NULL
+Prueba1$Index=NULL
+Prueba1$`Series Code`=NULL
+Prueba1$std=NULL
+write.csv(Prueba1, file = "GEE_limpio.csv", row.names = F)
+Gee=import("GEE_limpio.csv")
+#no parece haber diferencias notables
+```
+
+
+Segunda variable indice de rigurosidad
+Limpieza
+```{r}
+#Queremos solo el stringency index, el código del país (que es el key) y la fecha porque queremos la rigurosidad a 7 días.
+data3=data2 #copiamos data para tenerla a salvo de cambios
+#cambiamos nombres
+names(data3)[2]="CODE"
+data3[6:34]=NULL
+data3[7:15]=NULL
+#dejamos country porque la necesitaremos más adelante
+data3$RegionCode=NULL
+data3$RegionName=NULL #estamos tomando medidas a nivel de pais, no local
+data3$Date <- ymd(data3$Date)
+```
+
+Seleccionar para que tome solo rigurosidad en el séptimo día.
+
+
+```{r}
+#la primera parte de esto provienede los datos de Jose Incio.
+
+confirmed <- "https://github.com/CarlosGDiez/COVID-19/raw/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_deaths_global.csv"
+##############
+WorldData<-import(file = confirmed)%>%
+  mutate(type="datacon")%>% 
+  tidyr::gather(Fecha,Valor,-c(type,"Province/State",
+                        "Country/Region",Lat,Long))   #juntando fechas distintas en una sola.
+
+Prueba2= WorldData%>%
+  filter(Valor>0)
+names(Prueba2)[2]="Country"
+
+str(Prueba2$Country)
+Prueba2$Country=as.factor(Prueba2$Country)
+str(Prueba2$Fecha)
+Prueba2$Fecha=mdy(Prueba2$Fecha)
+Prueba2$Fecha=as.Date(Prueba2$Fecha)
+
+#juntando provincias en paises
+Prueba2=aggregate(Valor
+                  ~ Country + Fecha, 
+          data = Prueba2,    
+          sum)     
+
+#hay un problema tiene paises requerimos códigos, un simple merge de paises y codigos para alinearlo
+data4=data3
+data4$Date=NULL
+data4$GovernmentResponseIndex=NULL
+data4$RegionName=NULL
+data4$StringencyIndex=NULL
+names(data4)[1]="Country"
+#eliminamos paises repetidos. #advertencia algunas veces esta parte es lenta en leer, o lo era nates,a hora corre rapido
+data4=data4[!duplicated(data4$Country),]
+#Perfecto ahora tenemos una base que solo tien paises (key) y codigos
+
+#aplciaremos Merge más adelante
+
+
+#calcular dia 30
+
+
+
+Prueba30=Prueba2%>%
+  group_by(Country)%>%
+  mutate(dia30 = ifelse(Fecha==nth(Fecha,30), 1, 0))%>%
+  filter(dia30==1)
+
+#Habiendo hecho eso procedemos a repetirlo pero con el dia 7 que es ek qu eutikizarmeos para rigruosidad
+Prueba7=Prueba2%>%
+  group_by(Country)%>%
+  mutate(dia7 = ifelse(Fecha==nth(Fecha,7), 1, 0))%>%
+  filter(dia7==1)
+table(Prueba7$Fecha)
+dia7=merge(Prueba7,data4, by.x="Country", by.y="Country")
+
+#ahora podemos eliminar country en la data original
+data3[1]=NULL
+
+```
+
+Ahora creamos varaibles mergeables
+```{r}
+
+dia7$DIA7=paste(dia7$CODE,dia7$Fecha)
+dia7$Country=NULL
+dia7$dia7=NULL
+dia7$CODE=NULL 
+table(dia7$DIA7)
+data3$DIA7=paste(data3$CODE,data3$Date)
+data3$Date=NULL
+head(data3)
+
+
+ResGob=merge(data3,dia7, by.x="DIA7", by.y = "DIA7")
+#eliminamos valores ya no necesario como el mismo DIA 7 y es tan frustrante eliminarlo despues de tanto esfuerzo.
+ResGob$DIA7=NULL
+#El valor ya no es necesario es parte de la variable dependiente no de  esta independeinte
+ResGob$Valor=NULL
+write.csv(ResGob, file = "Rigurosidad_Limpia.csv", row.names = F)
+Rigurosidad=import("Rigurosidad_Limpia.csv")
+str(Rigurosidad$StringencyIndex)
+dataFINAL=merge(Rigurosidad,Gee, by.x="CODE",by.y = "CODE")
+write.csv(dataFINAL, file = "dataFINAL.csv", row.names = F)
+
+```
+
