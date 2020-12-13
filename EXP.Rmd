@@ -1,0 +1,1577 @@
+---
+author: "Carla Mendoza"
+date: "10/17/2020"
+output:
+  html_document: default
+  pdf_document: default
+xtitle: Data
+---
+
+Grupo: 2
+
+ 
+## libraries
+
+```{r}
+library(rio)
+library(stringi)
+library(htmltab)
+library(jsonlite)
+library(lubridate)
+library(readr)   
+library(stringr)
+library(tidyr)
+library(data.table)
+library(DescTools)
+library(readxl)
+```
+
+## Trabajando para limpiar las dos datas
+# Primera variable independiente: el porcentaje de gasto de salud por PBI (2017)
+
+1) Trayendo la base de datos
+
+```{r}
+data_salud <- "https://raw.githubusercontent.com/AriannaNKZC/TrabajoGrupal/bases-de-datos/API_SH.XPD.CHEX.GD.ZS_DS2_es_csv_v2_1347692.csv"
+gasto_salud=import(data_salud)
+```
+
+2) Eliminando las filas y columnas no significativas
+```{r}
+names(gasto_salud)=(gasto_salud[1,])
+gasto_salud = gasto_salud[-1,]
+gasto_salud = gasto_salud[,c(1,2, 62)]
+```
+
+3)  inspeccionando las variables
+
+```{r}
+str(gasto_salud$`2017`)
+names(gasto_salud) = c("PAIS", "CODE","GS_2017")
+summary(gasto_salud)
+#quitando las tildes
+gasto_salud$PAIS =stri_trans_general(gasto_salud$PAIS,"Latin-ASCII")
+```
+
+# Segunda variable: PBI PER CAPITA por precio de dolar actual (2018)
+
+1) Extrayendo la base de datos
+```{r}
+library(readxl)
+data_ppp <- "https://raw.githubusercontent.com/AriannaNKZC/TrabajoGrupal/bases-de-datos/API_NY.GDP.PCAP.CD_DS2_es_csv_v2_1347337.csv"
+ppp_pib =import(data_ppp)
+```
+
+
+2) Eliminación de columnas y el cambio de nombre 
+```{r}
+names(ppp_pib)=(ppp_pib[1,])
+ppp_pib = ppp_pib[-1,]
+ppp_pib = ppp_pib[,c(2,63)]
+names(ppp_pib) = c("CODE", "PPP_2018")
+```
+
+
+3) Base con listado de países (sin agrupación de continentes como el del Banco Mundial)
+```{r}
+linkfechas="https://github.com/MariaJoseVega/Trabajo-grupal-2020.2/raw/master/BASE_FECHA_INICIO.xlsx"
+datafechas=import(linkfechas)
+datafechas = datafechas[,c(1,2)]
+names(datafechas) = c("COUNTRY","CODE")
+```
+
+
+4) Merge
+```{r}
+Tabla_Final = merge(gasto_salud,ppp_pib,by.x='CODE', by.y='CODE')
+taF = merge(Tabla_Final,datafechas,by.x='CODE', by.y='CODE')
+taF[!complete.cases(taF),]
+taF[!complete.cases(taF),] #solo hay 13 que no presentan la data completa
+#Dado que la data que manejaremos en el grupo se manejara por code, procedo a eliminar el listado de países 
+taF = taF[,-c(2,5)]
+```
+
+
+
+```{r}
+link1="https://github.com/CarlosGDiez/BasesLimpias/raw/master/Gee_sucio.csv"
+data1=import(link1) #esto puede ser demasiado pesado para correrlo como Chunk... como linea individual no tiene problema.
+dim(data1) 
+link2="https://github.com/CarlosGDiez/BasesLimpias/blob/master/Rigurosidad.csv?raw=true" #esto puede ser demasiado pesado para correrlo como Chunk... como linea individual no tiene problema.
+data2=import(link2)
+dim(data2)
+```
+
+#GEE
+
+```{r}
+library(dplyr)
+#Renombrar variables
+names(data1)[1]="Country"
+names(data1)[2]="CODE"
+names(data1)[3]="Series"
+#Filtrar para tomar valor GEE y no el error estandar
+Prueba1=data1%>%
+  group_by(Country)%>%
+  mutate(Index = ifelse(Series==nth(Series,1), 1, 0))%>%
+  filter(Index==1)
+#eliminamos filas vacías
+Prueba1=Prueba1[-c(215,216,217,218,219),]
+names(Prueba1)[5]="Indice"
+  Prueba1$Indice=parse_number(Prueba1$Indice)
+  #eliminamos filas sin valores
+Prueba1=Prueba1[-c(46,129,139,144,164),]
+str(Prueba1$Indice)
+Prueba1$Indice=as.numeric(Prueba1$Indice)
+str(Prueba1$Indice)
+```
+
+Limpieza adicional. Es útil reducir todo solo a código de país e indice,
+
+```{r}
+Prueba1$Country=NULL
+Prueba1$Series=NULL
+Prueba1$Index=NULL
+Prueba1$`Series Code`=NULL
+Prueba1$std=NULL
+#no parece haber diferencias notables
+```
+
+## indice de rigurosidad
+Limpieza
+```{r}
+data3=data2 #copiamos data para tenerla a salvo de cambios
+#cambiamos nombres
+names(data3)[2]="CODE"
+data3[6:34]=NULL
+data3[7:15]=NULL
+#dejamos country porque la necesitaremos más adelante
+data3$RegionCode=NULL
+data3$RegionName=NULL #estamos tomando medidas a nivel de pais, no local
+data3$Date <- ymd(data3$Date)
+```
+
+Seleccionar para que tome solo rigurosidad en el séptimo día.
+
+## Variable dependiente
+```{r}
+#la primera parte de esto provienede los datos de Jose Incio.
+
+confirmed <- "https://github.com/CarlosGDiez/COVID-19/raw/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv"
+
+WorldData<-import(file = confirmed)%>%
+  mutate(type="datacon")%>% 
+  tidyr::gather(Fecha,Valor,-c(type,"Province/State",
+                        "Country/Region",Lat,Long))   #juntando fechas distintas en una sola.
+
+Prueba2= WorldData%>%
+  filter(Valor>0)
+names(Prueba2)[2]="Country"
+
+str(Prueba2$Country)
+Prueba2$Country=as.factor(Prueba2$Country)
+str(Prueba2$Fecha)
+Prueba2$Fecha=mdy(Prueba2$Fecha)
+Prueba2$Fecha=as.Date(Prueba2$Fecha)
+
+#juntando provincias en paises
+Prueba2=aggregate(Valor
+                  ~ Country + Fecha, 
+          data = Prueba2,    
+          sum)     
+#hay un problema tiene paises requerimos códigos, un simple merge de paises y codigos para alinearlo
+data4=data3
+data4$Date=NULL
+data4$GovernmentResponseIndex=NULL
+data4$RegionName=NULL
+data4$StringencyIndex=NULL
+names(data4)[1]="Country"
+#eliminamos paises repetidos. #advertencia algunas veces esta parte es lenta en leer, o lo era nates,a hora corre rapido
+data4=data4[!duplicated(data4$Country),]
+#Perfecto ahora tenemos una base que solo tien paises (key) y codigos
+#aplciaremos Merge más adelante
+```
+
+##calculos de dias
+```{r}
+#calcular dia 30
+Prueba100=Prueba2%>%
+group_by(Country)%>%
+mutate(dia100= ifelse(Fecha==nth(Fecha,100),1,0))%>%
+filter(dia100==1)
+Prueba100=merge(Prueba100,data4, by.x="Country", by.y="Country")
+Prueba100=Prueba100[,-4]
+names(Prueba100)[4]="Code"
+#Habiendo hecho eso procedemos a repetirlo pero con el dia 7 que es ek qu eutikizarmeos para rigruosidad
+Prueba7=Prueba2%>%
+  group_by(Country)%>%
+  mutate(dia7 = ifelse(Fecha==nth(Fecha,7), 1, 0))%>%
+  filter(dia7==1)
+table(Prueba7$Fecha)
+dia7=merge(Prueba7,data4, by.x="Country", by.y="Country")
+#ahora podemos eliminar country en la data original
+data3[1]=NULL
+```
+Ahora creamos varaibles mergeables
+```{r}
+dia7$DIA7=paste(dia7$CODE,dia7$Fecha)
+dia7$Country=NULL
+dia7$dia7=NULL
+dia7$CODE=NULL 
+table(dia7$DIA7)
+data3$DIA7=paste(data3$CODE,data3$Date)
+data3$Date=NULL
+head(data3)
+```
+
+```{r}
+ResGob=merge(data3,dia7, by.x="DIA7", by.y = "DIA7")
+#eliminamos valores ya no necesario como el mismo DIA 7 y es tan frustrante eliminarlo despues de tanto esfuerzo.
+ResGob$DIA7=NULL
+#El valor ya no es necesario es parte de la variable dependiente no de  esta independeinte
+ResGob$Valor=NULL
+str(ResGob$StringencyIndex)
+dataFINAL=merge(ResGob,Prueba1, by.x="CODE",by.y = "CODE")
+```
+#infolaw
+```{r}
+infocamp = "https://raw.githubusercontent.com/CarlaMendozaE/Prueba/master/public-campaigns-covid.csv"
+dataic=import(infocamp)
+str(dataic$Date)
+names(dataic)[1]= "Country"
+names(dataic)[3]= "Fecha"
+dataic$DIA7=paste(dataic$Code, dataic$Fecha)
+```
+
+```{r}
+c7=merge(dataic, dia7, by.x="DIA7", by.y="DIA7") 
+c7=c7[,-c(1,4,7)]
+names(c7)=c("Country", "Code", "infoalawk", "Fecha")
+```
+
+#Población Urbana: Evidencia el porcentaje de la población urbana de un país
+```{r}
+xurb = "https://raw.githubusercontent.com/CarlaMendozaE/Prueba/master/API_SP.URB.TOTL.IN.ZS_DS2_es_csv_v2_1347951.csv"
+dataxurb=import(xurb)
+names(dataxurb)=(dataxurb[1,])
+
+dataxurb[,3:62]= NULL
+dataxurb[,4:5]= NULL
+
+names(dataxurb)[3]= "%poburb18"
+dataxurb$'%poburb18'=round(dataxurb$'%poburb18', digits = 2)
+
+dataxurb=dataxurb[c(-1,-61,-62,-63,-64,-65,-68,-73,-74,-95,-98,-102,-103,-104,-105,-107, -110,-128,-134,-135,-136,-139,-140,-142,-153,-156,-161,-170,-181,-191,-197,-198,-204,-215,-217,-218,-230,-231,-236,-238,-240,-241,-249),]
+dataxurb$num=c(1:222)
+rownames(dataxurb)=dataxurb[,4]
+dataxurb[,4]= NULL
+
+names(dataxurb)[2]= "Code"
+names(dataxurb)[1]= "Country"
+```
+
+Capacidad Estatal
+#Índice de Desarrollo Humano (Human Development Index): Indicador que integra las variables PBI, Educación y Esperanza de vida
+```{r}
+LIDH="https://github.com/CarlaMendozaE/Prueba/blob/master/IDH.xlsx?raw=true"
+IDH=import(LIDH)
+IDH[,c(1,8,9)]=NULL
+names(IDH)[2]= "HDI"
+names(IDH)[3]= "EXPECTATIVAVIDA"
+names(IDH)[4]= "EXPECTCOLE"
+names(IDH)[5]= "YEARS_SCHOOLING"
+names(IDH)[6]= "GNI_GROSSNATIONALINCOME"
+IDH[,-1]=lapply(IDH[,-1], as.numeric)
+str(IDH)
+IDH$HDI= as.numeric(IDH$HDI)
+IDH$HDI=round(IDH$HDI, digits = 4)
+#Eliminamos filas zzz
+IDH=IDH[c(-63,-118,-156,-193:-222),]
+```
+
+```{r}
+#Mergeamos solo con los países que nos interesan 
+IDH=merge(IDH,c7,by.x='Country', by.y='Country') 
+IDH=merge(IDH,Prueba100,by.x='Country', by.y='Country') 
+#Limpiamos
+IDH=IDH[,-c(11:12)]
+names(IDH)[7]="Code"
+names(IDH)[9]="d7"
+names(IDH)[10]="d100"
+```
+
+Sin embargo, nos interesa tenerla toda junta en un solo data frame. Así que mergeamos.
+```{r}
+Carla=merge(IDH, dataxurb, by.x = "Code", by.y = "Code")
+#Carla=merge(Carla, dataxrural, by.x = "Code", by.y = "Code")
+```
+
+
+```{r}
+#LIMPIA
+str(Carla)
+Carla=Carla[,-11]
+names(Carla)[2]="Country"
+```
+
+####AYUDA ECONOMICA
+LIMPIEZA INICIAL
+```{r}
+#EXTRAEMOS LA DATA
+library(rio)
+linkayuda="https://raw.githubusercontent.com/CarlosGDiez/BasesLimpias/master/Rigurosidad.csv"
+dataayuda=import(linkayuda)
+#ELIMINACION DE COLUMNAS NO NECESARIAS
+dataayuda = dataayuda[,c(1:5, 21)]
+#ELIMINAMOS LAS REGIONES (SOLO NOS INTERESAN LOS PAISES)
+#USA
+dataayuda <- dataayuda[-c(48601	:62640), ]
+#UK
+dataayuda <- dataayuda[-c(16741	:17820), ]
+#ELIMINAMOS LAS COLUMNAS DE REGION
+dataayuda <- dataayuda[,-c(3, 4) ]
+#SIMPLIFICAMOS LOS NOMBRES
+names(dataayuda) = c("pais", "code", "fecha", "apoyo")
+#TRANSFORMAMOS LA COLUMNA 3 EN FECHAS
+dataayuda[ , 3 ] <- ymd(dataayuda[, 3])
+```
+BASE DIA 1
+```{r}
+#CASOS CONFIRMADOS DE CONTAGIOS
+confirmed <- "https://github.com/CarlosGDiez/COVID-19/raw/master/csse_covid_19_data/csse_covid_19_time_series/time_series_covid19_confirmed_global.csv"
+
+dataconfirmados<-import(file = confirmed)%>%
+  mutate(type="datacon")%>% 
+  tidyr::gather(Fecha,Valor,-c(type,"Province/State",
+                        "Country/Region",Lat,Long))
+
+dataconfirmados[ , 6] <- mdy(dataconfirmados[, 6])
+prueba4= dataconfirmados%>%
+  filter(Valor>0)
+#JUNTAMOS LAS PROVINCIAS A UN SOLO PAIS
+names(prueba4)[2]="pais"
+names(prueba4)[6]="fecha"
+prueba4=aggregate(Valor # dependientes
+          ~ pais + fecha, # nivel
+          data = prueba4,    # data
+          sum)       # operacion
+#ALINEAMOS CODIGOS Y PAISES (DATA SOLO DE PAISES Y CODIGOS)
+datacode=dataayuda
+datacode$fecha=NULL
+datacode$apoyo=NULL
+#ELIMINAMOS PAISES REPETIDOS
+datacode=datacode[!duplicated(datacode$pais),]
+#DIA 7 
+dia7=prueba4%>%
+  group_by(pais)%>%
+  mutate(dia7 = ifelse(fecha==nth(fecha,7), 1, 0))%>%
+  filter(dia7==1)
+str(dia7$fecha)
+dia7$fecha=as.Date(dia7$fecha)
+#DIA 7 Y MERGE CON CODIGOS   
+dia7_final=merge(dia7,datacode, by.x="pais", by.y="pais")
+```
+
+JUNTAMOS LOS DIAS CON LOS DATOS PARA CADA DIA
+```{r}
+#CREACION DEL ID Y FECHA DEL DIA 7
+dia7_final$DIA7=paste(dia7_final$code,dia7_final$fecha)
+dia7_final$pais=NULL
+dia7_final$dia7=NULL
+dia7_final$code=NULL
+dataayuda$DIA7=paste(dataayuda$code,dataayuda$fecha)
+dataayuda$fecha=NULL
+head(dataayuda)
+#AGREGAMOS LOS DATOS DE APOYO ECONOMICO
+APOYOECO=merge(dia7_final,dataayuda, by.x="DIA7", by.y = "DIA7")
+APOYOECO$DIA7=NULL
+APOYOECO$Valor=NULL
+```
+
+####DENSIDAD DE LA POBLACION
+EXTRACCION Y LIMPIEZA INICIAL
+```{r}
+#EXTRAEMOS LA DATA
+
+linkdensidad="https://github.com/MariaJoseVega/Trabajo-grupal-2020.2/raw/master/Excel%20densidad.xlsx.xls"
+datadensidad=import(linkdensidad)
+#ELIMINAMOS FILAS INNCESESARIAS INICIALES
+datadensidad <- datadensidad[-c(1, 2), ]
+#LA PRIMERA FILA SE VUELVE HEADLINE
+names(datadensidad) <- as.matrix(datadensidad[1, ])
+datadensidad <- datadensidad[-1, ]
+datadensidad[] <- lapply(datadensidad, function(x) type.convert(as.character(x)))
+#ELIMINAMOS LAS COLUMNAS INNECESARIAS
+datadensidad = datadensidad[,c(1, 2, 63)]
+#SIMPLIFICAMOS LOS NOMBRES DE LAS COLUMNAS
+names(datadensidad) = c("pais", "code", "2018")
+```
+
+LIMPIEZA MÁS PROFUNDA
+```{r}
+#ORDENAMOS LA DATA ALFABETICAMENTE
+prueba3 <- datadensidad[order(datadensidad$pais),]
+rownames(prueba3)<-c(1:264)
+#ELIMINAMOS LAS FILAS INNECESARIAS
+prueba3 <- prueba3[-c(8, 9, 38, 40, 41, 61:64, 73:77, 81, 99, 100, 104, 106:109, 130:133, 135, 142:144, 158:161, 178, 182, 183, 185, 186, 196, 197, 215, 219, 220, 228:230, 253, 261), ]
+#NOMBRE FINAL
+datadensidadfinal<-prueba3
+```
+
+####TASA DE DESEMPLEO
+
+
+```{r}
+#EXTRAEMOS LA DATA
+datadesempleo <- "https://github.com/MariaJoseVega/Trabajo-grupal-2020.2/raw/master/datadesempleooriginal.csv"
+datadesempleo=import(datadesempleo)
+#SIMPLIFICAMOS LOS NOMBRES
+names(datadesempleo) = c("pais", "tasa")
+#ORDENAMOS LA DATA ALFABETICAMENTE
+datadesempleo <- datadesempleo[order(datadesempleo$pais),]
+rownames(datadesempleo)<-c(1:187)
+```
+
+DATA PAISES (PARA INCLUIR LOS CODIGOS DE LOS PAISES)
+```{r}
+data_salud <- "https://raw.githubusercontent.com/AriannaNKZC/TrabajoGrupal/bases-de-datos/API_SH.XPD.CHEX.GD.ZS_DS2_es_csv_v2_1347692.csv"
+gasto_salud=import(data_salud)
+gasto_salud = gasto_salud[,c(1, 2)]
+gasto_salud = gasto_salud[-c(1),]
+names(gasto_salud) = c("pais", "code")
+#MERGE (PARA AGREGAR LOS CODIGOS)
+prueba1=merge(datadesempleo,gasto_salud,all.x=T,all.y=T)
+```
+
+PRUEBA 1, LIMPIEZA DEL MERGE
+```{r}
+#ELIMINAMOS LAS FILAS INNCESARIAS
+prueba1 = prueba1[-c(1, 3:5, 8:11, 21:25, 28, 43, 86, 93, 94, 99:102, 108, 131: 134, 190, 192, 191, 198, 206, 212:215, 217:220, 228, 233, 234, 237, 246, 251, 252, 266, 267, 287, 288, 295, 308),]
+#CAMBIAMOS NOMBRES
+prueba1$pais =   gsub("Arabia Saudita", "Arabia Saudí", prueba1$pais)
+prueba1$pais =   gsub("Bahráin", "Bahrein", prueba1$pais)
+prueba1$pais =   gsub("Belarús", "Bielorrusia", prueba1$pais)
+prueba1$pais =   gsub("Benín", "Benin", prueba1$pais)
+prueba1$pais =   gsub("Birmania; Myanmar", "Birri", prueba1$pais)
+prueba1$pais =   gsub("Birri", "Birmania", prueba1$pais)
+prueba1$pais =   gsub("Myanmar", "Birmania", prueba1$pais)
+prueba1$pais =   gsub("Bosnia y Hercegovina", "Bosnia y Herzegovina", prueba1$pais)
+prueba1$pais =   gsub("Botsuana", "Botswana", prueba1$pais)
+prueba1$pais =   gsub("Brunei Darussalam", "Brunéi", prueba1$pais)
+prueba1$pais =   gsub("Brunéi", "Brunei", prueba1$pais)
+prueba1$pais =   gsub("Congo, República del", "Congo", prueba1$pais)
+prueba1$pais =   gsub("Congo, República Democrática del", "República Democrática del Congo", prueba1$pais)
+prueba1$pais =   gsub("Côte d'Ivoire", "Costa de Marfil", prueba1$pais)
+prueba1$pais =   gsub("Corea, República Popular Democrática de", "Corea del Norte", prueba1$pais)
+prueba1$pais =   gsub("Corea, República de", "Corea del Sur", prueba1$pais)
+prueba1$pais =   gsub("Egipto, República Árabe de", "Egipto", prueba1$pais)
+prueba1$pais =   gsub("Federación de Rusia", "Rusia", prueba1$pais)
+prueba1$pais =   gsub("Fiyi", "Fiji", prueba1$pais)
+prueba1$pais =   gsub("Hong Kong, Región Administrativa Especial", "Hong Kong", prueba1$pais)
+prueba1$pais =   gsub("Irán, República Islámica del", "Irán", prueba1$pais)
+prueba1$pais =   gsub("Kazajstán", "Kazajistán", prueba1$pais)
+prueba1$pais =   gsub("Kenia", "Kenya", prueba1$pais)
+prueba1$pais =   gsub("República Democrática Popular Lao", "Laos", prueba1$pais)
+prueba1$pais =   gsub("Lesoto", "Lesotho", prueba1$pais)
+prueba1$pais =   gsub("Macedonia del Norte", "Macedonia", prueba1$pais)
+prueba1$pais =   gsub("República de Moldova", "Moldavia", prueba1$pais)
+prueba1$pais =   gsub("Malaui", "Malawi", prueba1$pais)
+prueba1$pais =   gsub("Nueva Zelandia", "Nueva Zelanda", prueba1$pais)
+prueba1$pais =   gsub("Palaos", "Palau", prueba1$pais)
+prueba1$pais =   gsub("Papua-Nueva Guinea", "Papua Nueva Guinea", prueba1$pais)
+prueba1$pais =   gsub("República de Moldova", "Moldavia", prueba1$pais)
+prueba1$pais =   gsub("República Árabe Siria", "Siria", prueba1$pais)
+prueba1$pais =   gsub("Rwanda", "Ruanda", prueba1$pais)
+prueba1$pais =   gsub("Timor-Leste", "Timor Oriental", prueba1$pais)
+prueba1$pais =   gsub("Viet Nam", "Vietnam", prueba1$pais)
+prueba1$pais =   gsub("Yemen, Rep. del", "Yemen", prueba1$pais)
+prueba1$pais =   gsub("Viet Nam", "Vietnam", prueba1$pais)
+prueba1$pais =   gsub("Zimbabue", "Zimbabwe", prueba1$pais)
+prueba1$pais =   gsub("Kirguizistán", "Kirguistán", prueba1$pais)
+prueba1$pais =   gsub("Bután", "Bhután", prueba1$pais)
+prueba1$pais =   gsub("Suriname", "Surinam", prueba1$pais)
+prueba1$pais =   gsub("Tanzanía", "Tanzania", prueba1$pais)
+#JUNTAMOS LAS FILAS CON NOMBRES IGUALES
+
+prueba2=group_by(prueba1, pais)%>% 
+  summarize(tasa=max(tasa, na.rm = TRUE),
+            code=max(code, na.rm= TRUE))
+#CAMBIAMOS EL ORDEN Y NOMBRE FINAL
+datadesempleofinal <- prueba2[c("pais", "code", "tasa")]
+datadesempleofinal$tasa=  gsub("-Inf", NA, datadesempleofinal$tasa)
+```
+#insertando 
+
+
+#Public sector wage premium (compared to all private employees)	 
+
+```{r}
+library(rio)
+library(htmltab)
+
+efe = "https://raw.githubusercontent.com/AriannaNKZC/Estad-2/master/abr.csv"
+milagro = import(efe, skip = 1)
+str(milagro)
+
+names(milagro) = c("Code","Rule_olw")
+trimws(milagro,whitespace = "[\\h\\v]")
+```
+
+
+####MERGE DE LAS 3 TABLAS
+```{r}
+
+DATA1=merge(APOYOECO,datadensidad, by.x="code", by.y="code")
+DATAFINAL=merge(DATA1,datadesempleofinal, by.x="code", by.y="code")
+DATAFINAL = DATAFINAL[,c(1:4, 6, 8)]
+names(DATAFINAL) = c("Code", "Fecha", "Pais", "Apoyo", "Densidad", "Desempleo")
+DATAFINAL=DATAFINAL[!duplicated(DATAFINAL$Pais),]
+str(DATAFINAL)
+DATAFINAL$Densidad=as.numeric(DATAFINAL$Densidad)
+DATAFINAL$Desempleo=as.numeric(DATAFINAL$Desempleo)
+DATAFINAL$Apoyo = as.factor(DATAFINAL$Apoyo)
+levels(DATAFINAL$Apoyo) <- c("Sin apoyo", "Menos del 50% del sueldo", "Más del 50% del sueldo")
+names(DATAFINAL) = c("Code", "Fecha (Dia 7 de cada pais)", "Pais", "Apoyo Economico", "Densidad (2018)", "Desempleo (% al 2019)")
+str(DATAFINAL)
+```
+################################################################################
+#el grange merge
+```{r}
+names(taF)[1]="Code"
+names(dataFINAL)[1]="Code"
+names(dataFINAL)[3]="d7"
+data=merge(Carla, taF, by.x = "Code", by.y = "Code")
+data=merge(data, dataFINAL, by.x = "Code", by.y = "Code")
+data=merge(data, DATAFINAL, by.x = "Code", by.y = "Code")
+data=merge(data, Prueba100, by.x = "Code", by.y = "Code") 
+data=merge(data, milagros, by.x = "Code", by.y = "Code")
+
+
+
+
+#Contagiados al día30
+```
+Eliminamos lo que no sirve
+```{r}
+names(data)
+data=data[,c(-15,-17,-18,-22,-23)]
+data= data[-c(47:50),]
+```
+
+Renombramos
+```{r}
+names(data)[2]="Country"
+names(data)[9]="d7"
+names(data)[19]="Contagd100"
+names(data)[20]="Wage_full"
+
+```
+
+Cuántos na's hay
+```{r}
+data[!complete.cases(data),] #13 Valores perdidos!
+data = data[complete.cases(data),] #Los eliminamos
+```
+################################################################################
+
+#Tercer entregable
+```{r}
+library(tidyverse)
+library(DescTools)
+library(readxl)
+library(foreign)
+library(descr)
+library(DescTools)
+library(haven)
+library(car)
+library(psych)
+library(PMCMRplus)
+library(Rmisc)
+str(data)
+data = data[!duplicated(data),]
+scale_y_continuous(labels = scales::comma)
+
+#row.names(data) = data$Country
+#data$Country = NULL #Elimino country porque ya está como row name y el Code solo sirve para el merge
+```
+
+Reconfigurando variables
+```{r}
+
+#arreglando las númericas
+
+data$Contagd100 = as.numeric(data$Contagd100)
+data$`Desempleo (% al 2019)`  = as.numeric(data$`Desempleo (% al 2019)`) 
+table(data$`Apoyo Economico`)
+
+#Arreglando las ordinales
+
+data$`Apoyo Economico` = as.ordered(data$`Apoyo Economico`)
+str(data$`Apoyo Economico`)
+
+str(data$infoalawk)
+data$infoalawk = as.ordered(data$infoalawk)
+levels(data$infoalawk) = c("Ninguna", "Campañas del gobierno", "Campañas integrales")
+table(data$infoalawk)
+```
+
+
+## PRIMERA PARTE: ANALISIS UNIVARIADO
+
+### Categoria 1: Medidas preventivas: campañas informativas del covid 19 (medidas tempranas, campañas informativas y apoyo a través de ingresos )
+
+```{r}
+#campañas informativas
+str(data$infoalawk)
+Mode(data$infoalawk) #Moda: campañas integrales
+freq(data$infoalawk)
+Median(data$infoalawk) #Mediana: campañas integrales
+IQR(data$infoalawk)
+library(ggplot2)
+pie(table(data$infoalawk), main="Gráfico 1: Campañas informativas del Covid-19", col = c("mediumpurple1", "purple", "lightslateblue"))
+#Apoyo a través de ingresos 
+str(data$`Apoyo Economico`)
+Mode(data$`Apoyo Economico`)
+freq(data$`Apoyo Economico`)
+Median(data$`Apoyo Economico`, na.rm = TRUE) #sin apoyo
+IQR(data$`Apoyo Economico`) #1 
+pie(table(data$`Apoyo Economico`), main="Gráfico 2: Apoyo a través de ingresos contexto Covid-19", col = c("mediumpurple1", "purple", "lightslateblue"))
+#Medidas tempranas
+str(data$StringencyIndex)
+summary(data$StringencyIndex)
+sd(data$StringencyIndex)
+boxplot(data$StringencyIndex, col = "royalblue1", main = "Gráfico 3: Aplicación de medidas tempranas ")
+```
+
+
+
+### Categoría 2: Población (urbano, rural y densidad)
+
+```{r}
+## Urbano
+str(data$`%poburb18`)
+summary(data$`%poburb18`)
+sd(data$`%poburb18`)
+Mode(data$`%poburb18`)
+hist(data$`%poburb18`)
+boxplot(data$`%poburb18`, col = "cyan1", main = "Gráfico 4: Porcentaje de población urbana")
+## densidad
+str(data$`Densidad (2018)`)
+summary(data$`Densidad (2018)`)
+Mode(data$`Densidad (2018)`)
+sd(data$`Densidad (2018)`, na.rm = TRUE)
+mis.colores = colorRampPalette( c( "lightslateblue","cyan1"))
+hist(data$`Densidad (2018)`, col = mis.colores(14), main = "Gráfico 6: Densidad de población por metro cuadrado", xlab = "Densidad", ylab = "Países")
+```
+
+### Categoría 3: Capacidad Estatal (IDH, gasto en salud, GEE)
+
+```{r}
+## IDH
+str(data$HDI)
+summary(data$HDI)
+sd(data$HDI, na.rm = TRUE)
+Mode(data$HDI)
+boxplot(data$HDI, col = "seagreen1", main = "Gráfico 7: Indice de Desarrollo Humano")
+## Gasto en salud
+str(data$GS_2017)
+summary(data$GS_2017)
+sd(data$GS_2017, na.rm = TRUE)
+Mode(data$GS_2017)
+boxplot(data$GS_2017, col = "seagreen3", main = "Gráfico 8: Porcentaje de Gasto en Salud")
+## GEE
+str(data$Indice)
+summary(data$Indice)
+sd(data$Indice)
+Mode(data$Indice)
+boxplot(data$Indice, col = "seagreen4", main = "Gráfico 9: Indice de gobernanza")
+```
+
+
+## Categoria 4: Pobreza
+
+
+```{r}
+## PBI precio dolar actual
+summary(data$PPP_2018)
+sd(data$PPP_2018, na.rm = TRUE)
+Mode(data$PPP_2018, na.rm = TRUE)
+mis.colores1 = colorRampPalette( c(  "plum", "mediumpurple1","mediumpurple2", "plum1", "plum2"))
+boxplot(data$PPP_2018, col = mis.colores1(14), main = "Gráfico 10: PBI per cápita según el precio del dolar", xlab = "PPP 2018", ylab = NULL )
+## Desempleo
+summary(data$`Desempleo (% al 2019)`)
+sd(data$`Desempleo (% al 2019)`, na.rm = TRUE)
+Mode(data$`Desempleo (% al 2019)`, na.rm = TRUE)
+boxplot(data$`Desempleo (% al 2019)`, col = "plum1", main = "Gráfico 11: Porcentaje de desempleo en el 2018")
+```
+
+### ANÁLISIS BIVARIADO
+### Categoria 1: Medidas preventivas: campañas informativas del covid 19 (medidas tempranas, campañas informativas y apoyo a través de ingresos )
+
+Campañas informativas
+```{r}
+library(nortest)
+library(psych)
+##es una variable categórica requiere anova o chi cuadrado  
+###con medidas preventivas
+tabla=table(data$infoalawk,data$`Apoyo Economico`)
+chisq.test(tabla) #estadísticamente independientes pero hay un warning sobre que podría ser erorneo.
+
+aov(data$StringencyIndex~data$infoalawk)
+summary(aov(data$StringencyIndex~data$infoalawk))#medias distintas
+TukeyHSD(aov(data$StringencyIndex~data$infoalawk))#entre campañas integrales y ninguna, y eentre campañas del gobierno y ninguna
+boxplot <- ggplot(data, aes(y = StringencyIndex, x = infoalawk,fill=factor(infoalawk))) +
+  geom_boxplot()+ggtitle("Gráfico 12: Rigurosidad según el tipo de campañas")+xlab("campañas informativas")
+boxplot+ylab("Rigurosidad")
+```
+
+```{r}
+###con poblacion
+summary(aov(data$`%poburb18`~data$infoalawk))#no significativo-medias iguales
+summary(aov(data$`Densidad (2018)`~data$infoalawk))#no significativo-medias iguales
+
+##con capacidad
+summary(aov(data$HDI~data$infoalawk))#no significativo medias iguales
+summary(aov(data$GS_2017~data$infoalawk))#NO significativo medias iguales
+
+summary(aov(data$Indice~data$infoalawk)) #significativo medias distinttas.
+TukeyHSD(aov(data$Indice~data$infoalawk))#entre camapñas integrales y ninguna
+boxplot <- ggplot(data, aes(y = Indice, x = infoalawk,fill=factor(infoalawk))) +
+  geom_boxplot()+ggtitle("Gráfico 19: Gobernanza según tipo de campaña")+xlab("campañas informativas")
+boxplot+ylab("Efectividad de la Gobernanza")
+```
+
+```{r}
+str(data)
+```
+
+
+```{r}
+##con pobreza
+scale_y_continuous(labels = scales::comma)
+
+summary(aov(data$`Desempleo (% al 2019)`~data$infoalawk))#no significativa medias iguales
+summary(aov(data$PPP_2018~data$infoalawk))#no significativa medias iguales
+```
+Apoyo económico 
+```{r}
+##con medidas preventivas.
+summary(aov(data$StringencyIndex~data$`Apoyo Economico`))#medias distintas
+TukeyHSD(aov(data$StringencyIndex~data$`Apoyo Economico`))#entre menos del 50% y sin apoyo
+boxplot <- ggplot(data, aes(y = StringencyIndex, x =`Apoyo Economico` ,fill=factor(`Apoyo Economico`))) +
+  geom_boxplot()+ggtitle("Gráfico 13: Rigurosidad según el tipo de apoyo económico")+xlab("`Apoyo Economico`")
+boxplot+ylab("Rigurosidad")
+
+###con poblacion
+summary(aov(data$`%poburb18`~data$`Apoyo Economico`))#No significativa
+summary(aov(data$`Densidad (2018)`~data$`Apoyo Economico`))#no significativo-medias iguales
+
+##con capacidad
+summary(aov(data$HDI~data$`Apoyo Economico`))#No significativa
+summary(aov(data$GS_2017~data$`Apoyo Economico`))#No significativo 
+summary(aov(data$Indice~data$`Apoyo Economico`)) #No significativo 
+
+##con pobreza
+summary(aov(data$`Desempleo (% al 2019)`~data$`Apoyo Economico`))#no significativa 
+summary(aov(data$PPP_2018~data$`Apoyo Economico`))#No significativo
+```
+Rigurosidad
+```{r}
+##Con poblacion
+cor.test(data$StringencyIndex,data$`%poburb18`) #significativa inversa, fuerza media -0.36
+plot(StringencyIndex~`%poburb18`,data=data, main="Gráfico 22: Dispersion entre rigurosidad y población urbana", ylab="Rigurosidad", xlab="Porcentaje de población urbana")
+cor.test(data$StringencyIndex,data$`Densidad (2018)`) #No significativa
+plot(StringencyIndex~`Densidad (2018)`,data=data)
+##con capacidad
+cor.test(data$StringencyIndex,data$HDI) #significativa inversa, fuerza media -0.45
+plot(StringencyIndex~HDI,data=data, main="Gráfico 24: Dispersion entre rigurosidad e IDH", xlab="Indice de Desarrollo Humano", ylab="Indice de rigurosidad")
+cor.test(data$StringencyIndex,data$GS_2017) #No significativa
+plot(StringencyIndex~GS_2017,data=data, main="dispersion rigurosidad_GastoSalud")
+cor.test(data$StringencyIndex,data$Indice) #significativa inversa,  fuerza media -0.47
+plot(StringencyIndex~Indice,data=data, main="Gráfico 25: Dispersion entre rigurosidad y gobernanza",xlab="Indice de efectivad de la gobernanza", ylab="Indice de rigurosidad")
+##con pobreza
+cor.test(data$StringencyIndex,data$`Desempleo (% al 2019)`) #No significativa
+plot(StringencyIndex~`Desempleo (% al 2019)`,data=data)
+cor.test(data$StringencyIndex,data$PPP_2018, main="dispersion rigurosidad_PPP") #significativa inverza, fuerza media -0.40
+plot(StringencyIndex~PPP_2018,data=data)
+```
+
+### Categoría 2: Población (urbano, rural y densidad)
+Urbano
+```{r}
+##Con poblacion
+cor.test(data$`%poburb18`,data$`Densidad (2018)`) #No significativa
+plot(`%poburb18`~`Densidad (2018)`,data=data, main="Gráfico 14: Dispersion entre población urbana y densidad", xlab="Densidad poblacional", ylab="Porcentaje de población urbana")#tonto singapur
+##con capacidad
+cor.test(data$`%poburb18`,data$HDI) #significativa directa, alta correlacion 0.73
+plot(`%poburb18`~HDI,data=data, main="Gráfico 21: Dispersion entre la poblacion urbana e IDH", xlab="Indice de desarrollo humano", ylab="Porcentaje de población urbana")
+cor.test(data$`%poburb18`,data$GS_2017, main="dispersion Urbana_GastoSalud") #significativa directa, correlacion media 0.31
+plot(`%poburb18`~GS_2017,data=data)
+cor.test(data$`%poburb18`,data$Indice) #significativa directa, correlacion alta 0.58
+plot(`%poburb18`~Indice,data=data, main="Gráfico 20: Dispersion entre poblacion urbana y gobernanza", xlab="Indice de la efectividad de la gobernanza", ylab="Porcentaje de población urbana")
+##con pobreza
+cor.test(data$`%poburb18`,data$`Desempleo (% al 2019)`) #significativa inversa, baja correlacion 0.23
+plot(`%poburb18`~`Desempleo (% al 2019)`,data=data, main="dispersion Urbana_Desempleo")
+cor.test(data$`%poburb18`,data$PPP_2018) #significativa directa, alta correlacion 0.60
+plot(`%poburb18`~PPP_2018,data=data, main="Gráfico 23:Dispersion entre poblacion urbana y PBI",xlab="PBI per capital al precio del dolar actual", ylab="Pordentaje de población urbana")
+```
+Densidad
+```{r}
+
+##con capacidad
+cor.test(data$`Densidad (2018)`,data$HDI) #no significativa
+plot(`Densidad (2018)`~HDI,data=data)
+cor.test(data$`Densidad (2018)`,data$GS_2017) #no significativa
+plot(`Densidad (2018)`~GS_2017,data=data)
+cor.test(data$`Densidad (2018)`,data$Indice) #significativa directa, correlacion baja 0.21
+plot(`Densidad (2018)`~Indice,data=data, main="dispersion Densidad_GEE")
+##con pobreza
+cor.test(data$`Densidad (2018)`,data$`Desempleo (% al 2019)`) #no significativa
+plot(`Densidad (2018)`~`Desempleo (% al 2019)`,data=data)
+cor.test(data$`Densidad (2018)`,data$PPP_2018) #significativa directa, correlacion baja, 0.21
+plot(`Densidad (2018)`~PPP_2018,data=data, main="dispersion Densidad_PPP")
+```
+### Categoría 3: Capacidad Estatal (IDH, gasto en salud, GEE)
+IDH
+```{r}
+##con capacidad
+cor.test(data$HDI,data$GS_2017) #significativa directa, correlacion media 0.38
+plot(HDI~GS_2017,data=data, main="Gráfico 16: Dispersion entre IDH y gasto en salud", xlab="Gasto en salud", ylab = "Indice de Desarrollo Humano")
+cor.test(data$HDI,data$Indice) #significativa directa, correlacion alta 0.84
+plot(HDI~Indice,data=data, main="Gráfico 17: Dispersion entre IDH y gobernanza", xlab='Indice de la efectividad de la gobernanza',
+     ylab = 'Indice de Desarrollo Humano')
+##con pobreza
+cor.test(data$HDI,data$`Desempleo (% al 2019)`) #significativa inversa, correlacion media 0,35
+plot(HDI~`Desempleo (% al 2019)`,data=data, main="dispersion HDI_Desempleo")
+cor.test(data$HDI,data$PPP_2018) #significativa directa, correlacion alta 0.72
+plot(HDI~PPP_2018,data=data, main="Gráfico 26: Dispersión entre IDH y PBI", xlab='PBI per capita al precio del dolar actual', ylab="Indice de Desarrollo humano")
+```
+Porcentaje de gasto en salud
+```{r}
+##con capacidad
+cor.test(data$GS_2017,data$Indice) #significativa directa, correlacion media 0.41
+plot(GS_2017~Indice,data=data, main="Gráfico 15: Dispersion entre gasto en salud y gobernanza", xlab="Indice de gobernanza",ylab="Porcentaje de gasto en salud")
+##con pobreza
+cor.test(data$GS_2017,data$`Desempleo (% al 2019)`) #No significativa
+plot(GS_2017~`Desempleo (% al 2019)`,data=data)
+cor.test(data$GS_2017,data$PPP_2018) #significativa directa, correlacion media 0.38
+plot(GS_2017~PPP_2018,data=data, main="dispersion Gasto_Salud_PPP")
+```
+GEE
+```{r}
+##con pobreza
+cor.test(data$Indice,data$`Desempleo (% al 2019)`) #significativa inversa, correlacion baja 0.27
+plot(Indice~`Desempleo (% al 2019)`,data=data, main="dispersion GEE_Desempleo")
+cor.test(data$Indice,data$PPP_2018) #significativa directa, correlacion alta 0.81
+plot(Indice~PPP_2018,data=data, main="Gráfico 27:Dispersion entre gobernanza y PBI",xlab="PBI per cpaita por preciod el dolar actual", ylab="Indice de efectividad de la gobernanza")
+```
+## Categoria 4: Pobreza
+Desempleo
+```{r}
+cor.test(data$`Desempleo (% al 2019)`,data$PPP_2018) #significativa inversa, correlacion baja 0.25
+plot(`Desempleo (% al 2019)`~PPP_2018,data=data, main="Gráfico 18: Dispersion entre PBI y Desempleo", xlab= "PBI per cápita a precio del doalr actual", ylab="Desempleo")
+```
+Variable dependiente
+```{r}
+#con medidas preventivas
+summary(aov(data$Contagd100~data$infoalawk))#no significativo
+summary(aov(data$Contagd100~data$`Apoyo Economico`))#no significativo
+cor.test(data$Contagd100,data$StringencyIndex) #No significativa/a 100 significativa debil
+plot(Contagd100~StringencyIndex,data=data)
+##Con poblacion
+cor.test(data$Contagd100,data$`%poburb18`) #No significativa/significativa debil a 100 dias
+plot(Contagd100~`%poburb18`,data=data)
+cor.test(data$Contagd100,data$`Densidad (2018)`) #No significativa
+plot(Contagd100~`Densidad (2018)`,data=data)
+##con capacidad
+cor.test(data$Contagd100,data$HDI) #no significativa/signifcativa débil a 100 días.
+plot(Contagd100~HDI,data=data)
+cor.test(data$Contagd100,data$GS_2017) #no significativa
+plot(Contagd100~GS_2017,data=data)
+cor.test(data$Contagd100,data$Indice) #no significativa
+plot(Contagd100~Indice,data=data)
+##con pobreza
+cor.test(data$Contagd100,data$`Desempleo (% al 2019)`) #No significativa
+plot(Contagd100~`Desempleo (% al 2019)`,data=data)
+cor.test(data$Contagd100,data$PPP_2018) #no significativa
+plot(Contagd100~PPP_2018,data=data)
+```
+
+
+#depurando para el analisis
+
+```{r}
+library(haven)
+library(jtools)
+str(data)
+data$Code = NULL
+data$d7 = NULL
+data$d100 = NULL
+data$`%pobrur18` = NULL
+names(data)
+data$GEE = data$Indice
+data$Indice = NULL
+```
+
+#analisis exploratorio (EFA)
+
+#modelo original
+
+```{r}
+library(htmltab)
+library(stringr)
+library(polycor)
+library(ggcorrplot)
+library(psych)
+library(matrixcalc)
+library(GPArotation)
+library(plotly)
+library(fpc)
+library(cluster)
+library(dbscan)
+library(BBmisc)
+library(dplyr)
+```
+
+Calculemos matriz de correlación:
+```{r}
+theData = data
+theData = (theData[, c(2, 7:14, 16)])
+
+theData$`Apoyo Economico` = as.numeric(theData$`Apoyo Economico`)
+theData$infoalawk = as.numeric(theData$infoalawk)
+table(theData$`Apoyo Economico`)
+str(theData)
+
+```
+
+#cambiando a nombres más bonitos
+
+```{r}
+names(theData) = c("IDH", "Campañas informativas", "Población urbana (% al 2018)", "Gasto en Salud (2017)", "PBI per cápita (2018)", "Indice de Rigurosidad", "Apoyo Economico", "Densidad (2018)", "Desempleo (% al 2019)","Indice de efectividad de la gobernanza")
+```
+
+```{r}
+corMatrix=polycor::hetcor(theData)$correlations
+```
+Explorar correlaciones:
+```{r}
+ggcorrplot(corMatrix)
+#evaluandos ignificancia
+ggcorrplot(corMatrix,
+          p.mat = cor_pmat(corMatrix),
+          insig = "blank",
+          title = "Gráfico 1: Matriz de correlación")
+```
+
+3. verificar si los datos se pueden factorizar
+```{r}
+psych::KMO(corMatrix) 
+```
+4. Verificar si la matriz de correlaciones es adecuada
+```{r}
+cortest.bartlett(corMatrix,n=nrow(theData))$p.value>0.05
+library(matrixcalc)
+is.singular.matrix(corMatrix)
+```
+5. determinar en cuantos factores o variables latentes podriamos redimensionar la data
+```{r}
+fa.parallel(theData, fm = 'ML', fa = 'fa')
+```
+
+
+```{r}
+#instalar 'parameters' y 'n_factors'
+library(parameters)
+library(nFactors)
+library(see)
+sugerencia=parameters::n_factors(corMatrix)
+
+#instalar 'see'
+# tenemos:
+plot(sugerencia)
+```
+6. Redimensionar a numero menor de factores
+* Resultado inicial:
+```{r}
+resfa <- fa(theData,nfactors = 4,cor = 'mixed',rotate ="varimax",fm="minres")
+
+## mixed.cor is deprecated, please use mixedCor.
+print(resfa$loadings,cutoff = 0.5)
+```
+* resultado visual
+```{r}
+fa.diagram(resfa, main = c("Gráfico 2: Árbol de factorización del primer modelo"))
+```
+Evaluando Resultado obtenido:
+¿La Raíz del error cuadrático medio corregida está cerca a cero?
+```{r}
+resfa$crms
+```
+¿La Raíz del error cuadrático medio de aproximación es menor a 0.05?
+```{r}
+resfa$RMSEA
+```
+¿El índice de Tucker-Lewis es mayor a 0.9?
+```{r}
+resfa$TLI
+```
+¿Qué variables aportaron mas a los factores?
+```{r}
+sort(resfa$communality)
+```
+¿Qué variables contribuyen a mas de un factor? #conviene que salga 1
+```{r}
+sort(resfa$complexity)
+```
+
+```{r}
+factorial_casos<-as.data.frame(resfa$scores) #en esta no me sale el factorial
+head(factorial_casos)
+summary(factorial_casos)
+
+```
+
+Tras muchos errores y fracasos llegamos al gran momento
+
+#EL ULTIMO GRAN GRANDISIMO EXPERIMENTO 626
+
+Calculemos matriz de correlación:
+```{r}
+theDataa = data
+names(theDataa)
+theDataa$Country = NULL
+theDataa$HDI = NULL
+theDataa$Contagd100 = NULL
+str(theDataa)
+theDataa$infoalawk = as.numeric(theDataa$infoalawk)
+theDataa$`Apoyo Economico` = as.numeric(theDataa$`Apoyo Economico`)
+
+#quitamos pobreza
+theDataa$PPP_2018 = NULL
+theDataa$`Desempleo (% al 2019)` = NULL
+names(theDataa) 
+```
+
+```{r}
+names(theDataa) = c("Expectativa de vida", "Años proyectados de escolarización", "Años de escolaridad", "Renta per cápita","Campañas informativas", "Población urbana (% al 2018)", "Gasto en Salud (2017)", "Indice de Rigurosidad", "Apoyo Economico", "Densidad (2018)", "Indice de efectividad de la gobernanza")
+```
+
+
+```{r}
+xcorMatrix=polycor::hetcor(theDataa)$correlations
+```
+Explorar correlaciones:
+```{r}
+ggcorrplot(xcorMatrix)
+#evaluandos ignificancia
+ggcorrplot(xcorMatrix,
+          p.mat = cor_pmat(xcorMatrix),
+          insig = "blank",
+           title = "Gráfico 3: Matriz de correlación del modelo alternativo")
+```
+3. verificar si los datos se pueden factorizar
+```{r}
+psych::KMO(xcorMatrix) 
+```
+4. Verificar si la matriz de correlaciones es adecuada
+```{r}
+cortest.bartlett(xcorMatrix,n=nrow(theDataa))$p.value>0.05
+library(matrixcalc)
+
+is.singular.matrix(xcorMatrix)
+```
+5. determinar en cuantos factores o variables latentes podriamos redimensionar la data
+```{r}
+fa.parallel(theDataa, fm = 'ML', fa = 'fa')
+```
+
+```{r}
+#instalar 'parameters' y 'n_factors'
+sugerenciax=parameters::n_factors(xcorMatrix)
+
+#instalar 'see'
+# tenemos:
+plot(sugerenciax)
+```
+
+6. Redimensionar a numero menor de factores
+
+* Resultado inicial:
+```{r}
+library(GPArotation)
+resfa_1 <- fa(theDataa,nfactors = 2,cor = 'mixed',rotate = "varimax",fm="minres")
+
+## mixed.cor is deprecated, please use mixedCor.
+print(resfa_1$loadings,cutoff = 0.5)
+```
+* Resultado visual
+```{r}
+fa.diagram(resfa_1, main = "Gráfico 4: Árbol de factorización del modelo alternativo")
+```
+Evaluando Resultado obtenido:
+¿La Raíz del error cuadrático medio corregida está cerca a cero?
+```{r}
+resfa_1$crms
+```
+¿La Raíz del error cuadrático medio de aproximación es menor a 0.05?
+```{r}
+resfa_1$RMSEA
+```
+¿El índice de Tucker-Lewis es mayor a 0.9?
+```{r}
+resfa_1$TLI
+```
+¿Qué variables aportaron mas a los factores?
+```{r}
+sort(resfa_1$communality)
+```
+¿Qué variables contribuyen a mas de un factor? #conviene que salga 1
+```{r}
+sort(resfa_1$complexity)
+```
+
+```{r}
+factorial_casos_1<-as.data.frame(resfa_1$scores) #en esta no me sale el factorial
+head(factorial_casos_1)
+summary(factorial_casos_1)
+
+```
+
+#Nueva alternativa nacida en el presente entregable
+
+Calculemos matriz de correlación:
+```{r}
+laData = data
+laData = (data[, c(2, 7:14, 16)])
+names(laData)
+
+laData$`Apoyo Economico` = as.numeric(theData$`Apoyo Economico`)
+laData$infoalawk = as.numeric(laData$infoalawk)
+table(laData$`Apoyo Economico`)
+str(laData)
+
+laData$`Densidad (2018)` = NULL
+laData$`%poburb18` = NULL
+
+```
+
+```{r}
+corMatrixw=polycor::hetcor(laData)$correlations
+```
+
+Explorar correlaciones:
+```{r}
+ggcorrplot(corMatrixw)
+#evaluandos ignificancia
+ggcorrplot(corMatrixw,
+          p.mat = cor_pmat(corMatrixw),
+          insig = "blank",
+          title = "Gráfico 5: Matriz de correlación")
+```
+
+3. verificar si los datos se pueden factorizar
+```{r}
+psych::KMO(corMatrixw) 
+```
+4. Verificar si la matriz de correlaciones es adecuada
+```{r}
+cortest.bartlett(corMatrixw,n=nrow(laData))$p.value>0.05
+is.singular.matrix(corMatrixw)
+```
+5. determinar en cuantos factores o variables latentes podriamos redimensionar la data
+```{r}
+fa.parallel(laData, fm = 'ML', fa = 'fa')
+```
+
+
+```{r}
+#instalar 'parameters' y 'n_factors'
+sugerencia1=parameters::n_factors(corMatrixw)
+#instalar 'see'
+# tenemos:
+plot(sugerencia1)
+```
+6. Redimensionar a numero menor de factores
+* Resultado inicial:
+```{r}
+resfa_2 <- fa(laData,nfactors = 2,cor = 'mixed',rotate ="varimax",fm="minres")
+
+## mixed.cor is deprecated, please use mixedCor.
+print(resfa_2$loadings,cutoff = 0.5)
+```
+* resultado visual
+```{r}
+fa.diagram(resfa_2, main = c("Gráfico 2: Árbol de factorización del primer modelo"))
+```
+Evaluando Resultado obtenido:
+¿La Raíz del error cuadrático medio corregida está cerca a cero?
+```{r}
+resfa_2$crms
+```
+¿La Raíz del error cuadrático medio de aproximación es menor a 0.05?
+```{r}
+resfa_2$RMSEA
+```
+¿El índice de Tucker-Lewis es mayor a 0.9?
+```{r}
+resfa_2$TLI
+```
+¿Qué variables aportaron mas a los factores?
+```{r}
+sort(resfa_2$communality)
+```
+¿Qué variables contribuyen a mas de un factor? #conviene que salga 1
+```{r}
+sort(resfa_2$complexity)
+```
+
+```{r}
+factorial_casos2<-as.data.frame(resfa_2$scores) #en esta no me sale el factorial
+head(factorial_casos2)
+summary(factorial_casos2)
+
+```
+
+Tras muchos errores y fracasos llegamos al gran momento
+
+
+
+```{r}
+CCMA=cbind(data[1],as.data.frame(resfa_2$scores))
+```
+
+```{r}
+data$CAPACIDAD_ABC= normalize(CCMA$MR1, 
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+data$MEDIDAS_ABC=normalize(CCMA$MR2, 
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+```
+
+
+```{r}
+WXYZ=cbind(data[1],as.data.frame(resfa$scores))
+```
+
+```{r}
+data$desarrollo_poblacional= normalize(WXYZ$MR1, 
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+data$medidas_t=normalize(WXYZ$MR2, 
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+data$g_salud=normalize(WXYZ$MR3, #notese ahora habra dos columnas salud
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+data$densidad=normalize(WXYZ$MR4, #notese ahora habra dos columnas d e densidad
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+```
+
+
+```{r}
+ABCD=cbind(data[1],as.data.frame(resfa_1$scores))
+```
+
+```{r}
+
+data$capacidad=normalize(ABCD$MR1, 
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+data$medidas=normalize(ABCD$MR2, 
+                       method = "range", 
+                       margin=2, # by column
+                       range = c(0, 10))
+```
+
+# regresión lineal original
+
+```{r}
+library(ggpubr) #gráfico para ver normalidad
+library(scatterplot3d)
+library(stargazer)
+library(lmtest)
+```
+
+```{r}
+#infoawk (o como se escriba)
+
+str(data$infoalawk)
+data$infoalawk = as.ordered(data$infoalawk)
+levels(data$infoalawk) = c("Ninguna", "Campañas del gobierno", "Campañas integrales")
+table(data$infoalawk)
+
+#apoyo economico
+
+data$`Apoyo Economico` = as.factor(data$`Apoyo Economico`)
+levels(data$`Apoyo Economico`) <- c("Sin apoyo", "Menos del 50% del sueldo", "Más del 50% del sueldo")
+data$`Apoyo Economico` = as.ordered(data$`Apoyo Economico`)
+table(data$`Apoyo Economico`)
+```
+
+```{r}
+names(data)
+data_regre = data [,c(1:22)]
+data_regre$Country = NULL
+str(data_regre)
+names(data_regre)=c("IDH","EXPECTATIVAVIDA", "EXPECTCOLE", "añosEscol","RentaNacional", "Campañas informativas", "PoblacionUrbana", "GastoenSalud", "PBI per cápita (2018)", "Indice de Rigurosidad", "Apoyo Economico", "Densidad", "Desempleo (% al 2019)","Contagiados", "Indice de efectividad de la gobernanza", "desarrollo_poblacional","medidas_t","g_salud","FactorDensidad","Factorcapacidad","FactorMedidas")
+```
+
+# lineas de comprobación de la hipótesis original 
+
+```{r}
+hipotesis = formula(Contagiados ~ data_regre$`Indice de efectividad de la gobernanza` + data_regre$PoblacionUrbana + data_regre$`Indice de Rigurosidad`+data_regre$IDH + data_regre$GastoenSalud +data_regre$Densidad+data_regre$`PBI per cápita (2018)` + data_regre$`Desempleo (% al 2019)`+factor(data_regre$`Campañas informativas`)+factor(data_regre$`Apoyo Economico`))
+regre = lm(hipotesis, data=data_regre) #no valida 0.07
+stargazer(regre, type="text")
+
+demografia = formula(data_regre$Contagiados~ data_regre$PoblacionUrbana + data_regre$Densidad) #0.01
+demografiaX = lm(demografia, data=data_regre)#valida explica 0.06
+
+stargazer(demografiaX, type='text')
+
+capacidad = formula(Contagiados ~ data_regre$IDH + data_regre$GastoenSalud + data_regre$`Indice de efectividad de la gobernanza`) #0.02
+capacidadx = lm(capacidad, data=data_regre)#0.04 explica 0.057
+stargazer(capacidadx, type='text')
+
+medidas_preventivas = formula(Contagiados ~ factor(data_regre$`Campañas informativas`) + data_regre$`Indice de Rigurosidad` + factor(data_regre$`Apoyo Economico`))
+preventivasx = lm(medidas_preventivas, data=data_regre) #no valida, 0.18
+
+stargazer(preventivasx, type="text")
+
+pobreza = formula(Contagiados ~ data_regre$`PBI per cápita (2018)` + data_regre$`Desempleo (% al 2019)`)
+pobrezax = lm(pobreza, data=data_regre) #no valida 0.54
+stargazer(pobrezax, type = "text")
+```
+
+#### el gran stargazer 
+```{r}
+stargazer(regre,demografiaX, capacidadx, preventivasx, pobrezax, type = "text")# no me corre
+```
+
+## probando la alternativa alterna (eligiendo las mejores variables del modelo anterior)
+
+```{r}
+modelo_estrella = formula(Contagiados ~ data_regre$`Indice de Rigurosidad` + data_regre$PoblacionUrbana + data_regre$`Indice de efectividad de la gobernanza`+data_regre$IDH) #(Aqui ninguno sería significativo mientras que....)
+estrella=lm(modelo_estrella, data= data_regre)
+summary(estrella)
+modelo_estrellita = formula(Contagiados ~ data_regre$`Indice de Rigurosidad` + data_regre$PoblacionUrbana+data_regre$`Indice de efectividad de la gobernanza`) #Aqui solo urbana
+estrellita=lm(modelo_estrellita, data= data_regre)
+summary(estrellita)
+
+SoloUrbana=formula(Contagiados ~ data_regre$PoblacionUrbana)
+Urbana=lm(SoloUrbana,data = data_regre)
+```
+
+### probando el stargazer de ambas estrellas
+```{r}
+stargazer(regre, estrella, estrellita, type="text")#0.01 explica 0.07 de R cuadrado ajustado.
+```
+
+## con los factores del primer experimento
+
+```{r}
+QUIERO = formula(Contagiados ~ data_regre$desarrollo_poblacional + data_regre$medidas_t + data_regre$g_salud + data_regre$FactorDensidad)
+totalidad = lm(QUIERO, data=data_regre) #0.06
+
+QUE = formula(Contagiados ~ data_regre$desarrollo_poblacional)
+Desarrollo_pby = lm(QUE, data=data_regre) #0.02
+
+A1 = formula(Contagiados ~ data_regre$medidas_t)
+Medidasy = lm(A1, data=data_regre) #0.04
+B1 = formula(Contagiados~ data_regre$g_salud)
+GastoSy = lm(B1, data=data_regre) #0.02
+
+C1 = formula(Contagiados~ data_regre$FactorDensidad) 
+Densidady = lm(C1, data=data_regre) #0.64
+```
+
+### stargazer correspondiente
+```{r}
+stargazer(totalidad,Desarrollo_pby, Medidasy, GastoSy, Densidady, type = "text") #ninguna pasa
+
+```
+
+
+#### con los factores del último experimento 626
+
+```{r}
+Y = formula(Contagiados ~ data_regre$Factorcapacidad + data_regre$FactorMedidas + data_regre$`PBI per cápita (2018)` + data_regre$Densidad + data_regre$`Desempleo (% al 2019)`)
+Variablesw= lm(Y, data=data_regre) #0.15
+summ(Variablesw)
+
+X = formula(Contagiados ~ data_regre$Factorcapacidad + data_regre$FactorMedidas)
+medidas_w = lm(X, data=data_regre) 
+summary(medidas_w)
+
+A = formula(Contagiados ~ data_regre$Factorcapacidad)
+capacityw = lm(A, data=data_regre)
+
+B = formula(Contagiados ~ data_regre$FactorMedidas)
+medidas_tempranas = lm(B, data=data_regre)
+
+
+stargazer(Variablesw, medidas_w, medidas_tempranas,Variablesw, type = "text") #solo pasa medidas y solo explica 0.35
+```
+
+#Viendo el valor de Urbana sería mejor verla como cluster?
+
+##5 Usando clusters: s epueden usar en regresion clusters para crear una ordinal
+
+```{r}
+set.seed(123)
+# creemos clusters con las variable relacionadas con felicidad
+
+dist=daisy(data[8], metric="gower")
+
+library(factoextra)
+fviz_nbclust(data[8], pam,diss=g.dist,method = "gap_stat",k.max = 10,verbose = F)
+res.pam = pam(dist,6,cluster.only = F)
+
+fviz_silhouette(res.pam)
+
+data$pamURB=res.pam$clustering
+```
+
+Te puedes quedar con demo es iguak, pero si tienens varias vairables que tienen sentido y se diferencian de emocracia, y tienene sentido y la factorizacion no lo muestra, entonces puedes tomarlo, hacerlo tu mismo en clusters
+Como ranlea valor de cluster?
+
+
+```{r}
+aggregate(data$`%poburb18`~pamURB,data = data,FUN = mean) #primero tengo que ver esten eordenno siempre lo están si no está que reordenar, no convertir en clsuters sin hacerlo...
+data$pamURB=recode(data$pamURB, "5=1; 4=2; 3=3; 1=4; 6=5; 2=6", as.factor = T)
+
+```
+
+No se necesita recodificar va como ascendente
+
+```{r}
+#como ordinal!
+data$pamURB=as.ordered(data$pamURB)
+
+AA = formula(data_regre$Contagiados~ data$CAPACIDAD_ABC + data$MEDIDAS_ABC + factor(data$pamURB) + data$`Densidad (2018)`)
+AA1 = lm(AA)
+summ(AA1)
+
+AAw = formula(data_regre$Contagiados ~ data$CAPACIDAD_ABC + data$MEDIDAS_ABC + factor(data$pamURB))
+AA2 = lm(AAw)
+summ(AA2)
+
+
+stargazer(AA1,AA2, type ="text")
+
+regresion2 = AA2
+```
+
+
+Efecto lineal significativo (pamhappy.L), pero cuadratico no (pamhappy.Q). El lineal nos importara pues quiere decir el efecto de apsar d euno al dos, del dos al 3. Esto quiere decir si país esta en grupo 1 de felicidad su indice de felciidad sube en promedio 2.49, si lelga  asubir a nivel 2 de felicidad (lo mismo con de 2  a3 )
+
+regresion2 
+
+```{r}
+#LINEALIDAD
+plot(regresion2, 1, main = c("Gráfico 2: Linealidad"))  #diagonal, casi lineal
+```
+    B. Homocedasticidad. 
+
+
+```{r}
+plot(regresion2, 3, main = c("Gráfico 3: Homocedasticidad"))#diagonal
+bptest(regresion2) #valor P mayor a 0.05 Homocedasticidad
+```
+    c. Normalidad de residuos. Puntos cerca de la diagonal.
+  
+```{r}
+plot(regresion2, 2, main = c("Gráfico 4: Normalidad de residuos")) #se alejan de diagonal
+shapiro.test(regresion2$residuals) #menor a 0.05 el valor P entonces indica que no hay normaldiad de residusos
+```
+#no multicolinealidad solo una variable
+
+
+
+ 5.2 ver valores influyentes
+  Prestar atención al indice de Cook. 
+```{r}
+plot(regresion2, 5, main = c("Gráfico 5: Identificación de valores influyentes"))
+
+checkregresion2=as.data.frame(influence.measures(regresion2)$is.inf)
+
+checkregresion2[checkregresion2$cook.d | checkregresion2$hat,] #22 y 73
+```
+
+
+```{r}
+VIF(regresion2)
+```
+
+```{r}
+stargazer(AA2, regre, estrella, estrellita, type = "text")
+
+```
+
+
+
+
+```{r}
+stargazer(AA2, regre, estrella, estrellita, type = "text")
+summ(AA2)
+summ(regre)
+summ(estrella)
+summ(estrellita)
+```
+
+
+```{r}
+tanova=anova(estrella,estrellita)
+stargazer(tanova,type = 'text',summary = F,title = "Table de Análisis de Varianza")
+
+tanova=anova(estrella,AA2)
+stargazer(tanova,type = 'text',summary = F,title = "Table de Análisis de Varianza")
+
+library(ggplot2)
+library(sjPlot)
+plot_models(estrella,estrellita,AA2,vline.color = "grey",m.labels=c("Modelo 1","Modelo 2","Modelo 3"))
+```
+
+
+
+```{r}
+HappyDemo = data
+str(HappyDemo)
+names(HappyDemo)
+model <- ' capacidad  =~ HDI + GS_2017 + GEE + PPP_2018
+           medidas =~ infoalawk + StringencyIndex + Apoyo Economico'
+HappyDemo = (data[, c(2, 7, 9, 10, 11, 12, 16)])
+```
+
+
+```{r}
+str(HappyDemo)
+
+HappyDemo$infoalawk = as.numeric(HappyDemo$infoalawk)
+HappyDemo$`Apoyo Economico` = as.numeric(HappyDemo$`Apoyo Economico`)
+
+
+HappyDemo=scale(HappyDemo)
+library(lavaan)
+
+cfa_fit <- cfa(model, data=HappyDemo)
+
+```
+
+
+
+
+
+
+
+
+
